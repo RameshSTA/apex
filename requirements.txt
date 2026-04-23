@@ -1,0 +1,27 @@
+# Apex — Revenue Intelligence Platform
+# python run.py  after  pip install -r requirements.txt
+
+# Core scientific stack
+numpy>=1.24.0
+pandas>=2.0.0
+scipy>=1.10.0
+
+# Machine learning
+scikit-learn>=1.3.0
+
+# Visualisation (used in notebooks)
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Testing
+pytest>=7.4.0
+
+# HTTP (for Claude agent API calls in pipeline/06)
+requests>=2.31.0
+
+# ── Optional performance upgrades ─────────────────────────────────
+# Uncomment if you want faster GB or explicit LP solvers:
+# xgboost>=1.7.0          # drop-in replacement for sklearn GBR
+# lightgbm>=4.0.0         # alternative gradient boosting
+# statsmodels>=0.14.0     # replaces manual HW / ADF implementations
+# pulp>=2.7.0             # alternative LP solver to scipy linprog
