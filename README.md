@@ -9,7 +9,7 @@
 [![pandas](https://img.shields.io/badge/pandas-2.2-150458?style=flat-square&logo=pandas&logoColor=white)](https://pandas.pydata.org)
 [![scikit-learn](https://img.shields.io/badge/scikit--learn-1.5-F7931E?style=flat-square&logo=scikit-learn&logoColor=white)](https://scikit-learn.org)
 [![SciPy](https://img.shields.io/badge/SciPy-HiGHS%20LP-8CAAE6?style=flat-square&logo=scipy&logoColor=white)](https://scipy.org)
-[![Anthropic](https://img.shields.io/badge/Claude-Tool%20Calling-D4A853?style=flat-square)](https://anthropic.com)
+[![Agentic](https://img.shields.io/badge/Agent-Tool%20Calling-D4A853?style=flat-square)](#agentic-layer--tool-calling-orchestrator)
 [![Chart.js](https://img.shields.io/badge/Chart.js-4.4-FF6384?style=flat-square&logo=chartdotjs&logoColor=white)](https://www.chartjs.org)
 [![License](https://img.shields.io/badge/License-MIT-f0a500?style=flat-square)](LICENSE)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-Ramesh%20Shrestha-0077B5?style=flat-square&logo=linkedin&logoColor=white)](https://www.linkedin.com/in/rameshsta/)
@@ -40,7 +40,7 @@
 - [Forecasting Layer — Hybrid Holt-Winters + Gradient Boosting](#forecasting-layer--hybrid-holt-winters--gradient-boosting)
 - [Optimisation Layer — Linear Programme + Bid-Price Duality](#optimisation-layer--linear-programme--bid-price-duality)
 - [Causal Layer — Difference-in-Differences + 2SLS Instrumental Variables](#causal-layer--difference-in-differences--2sls-instrumental-variables)
-- [Agentic Layer — Claude Tool-Calling Orchestrator](#agentic-layer--claude-tool-calling-orchestrator)
+- [Agentic Layer — Tool-Calling Orchestrator](#agentic-layer--tool-calling-orchestrator)
 - [Data and Statistical Grounding](#data-and-statistical-grounding)
 - [Engineering Practices](#engineering-practices)
 - [Project Structure](#project-structure)
@@ -52,11 +52,11 @@
 
 ## Business Case
 
-Qantas Group generated **A$23.8B in revenue and A$2.08B in EBIT in FY2025** on a base of 55.9 million passengers and 365 aircraft. A **1% improvement in yield on the A$18B passenger revenue base is worth approximately A$180M annually** — every pricing-model decision on every flight multiplies at that scale. Yet the majority of revenue-management decisions at Australian domestic carriers still run through static PROS availability controls, class-mix targets set quarterly by commercial analysts, and elasticity estimates drawn from correlational OLS regressions that are known to be biased by simultaneity.
+Qantas Group generated **A$23.8B in revenue and A$2.39B in underlying PBT in FY2025** on a base of 55.9 million passengers and 363 aircraft. A **1% improvement in yield on the A$18B passenger revenue base is worth approximately A$180M annually** — every pricing-model decision on every flight multiplies at that scale. Yet the majority of revenue-management decisions at Australian domestic carriers still run through static availability controls, class-mix targets set quarterly by commercial analysts, and elasticity estimates drawn from correlational OLS regressions that are known to be biased by simultaneity.
 
 Three structural shifts are re-pricing that status quo simultaneously. Virgin Australia has re-entered the market post-recapitalisation with aggressive trunk-route pricing. Rex Airlines entered voluntary administration in July 2024, removing a competitor on a well-defined subset of regional routes and creating an ideal natural experiment that nobody internally was equipped to measure causally. Project Sunrise — Qantas's A350 ultra-long-haul programme — enters commercial service in FY2027 with **zero historical booking-curve data** to anchor revenue-management decisions. Static rule-based RM cannot handle any of these.
 
-Apex was built to address these problems with production-grade quantitative methods: a calibrated hybrid forecasting engine, a mathematically-defensible linear-programme optimiser, two causal-identification strategies implemented from scratch in NumPy, and an agentic orchestrator built on Claude tool-calling.
+Apex was built to address these problems with production-grade quantitative methods: a calibrated hybrid forecasting engine, a mathematically-defensible linear-programme optimiser, two causal-identification strategies implemented from scratch in NumPy, and an agentic orchestrator built on structured tool-calling.
 
 | Problem | Scale of Impact | Apex Solution |
 |:---|:---|:---|
@@ -64,9 +64,9 @@ Apex was built to address these problems with production-grade quantitative meth
 | Cabin-mix optimisation across 4 cabins × 365 aircraft × network | Static quarterly mix targets leave A$50–100M of annual EBIT on the table through bid-price mis-pricing | scipy HiGHS linear-programme with access-floor constraints — dual variables recovered as defensible bid prices |
 | Price-elasticity identification for yield decisions | Correlational OLS is upward-biased in magnitude; pricing teams acting on OLS systematically over-discount in competitive scenarios | 2SLS instrumental variables with IATA jet-fuel index — Staiger-Stock F-diagnostic, Hausman endogeneity test, HC1-robust SEs |
 | Competitor-event response (Rex administration, Virgin repricing) | Analyst intuition is the current tool; causal effect on yield has never been measured | Difference-in-Differences with parallel-trends placebo validation — heteroskedasticity-robust inference |
-| Scaling an analyst's judgement across the network | A revenue-management team cannot manually review the ~600,000 flight-level pricing decisions/year | Claude tool-calling agent that plans forecast → optimise chains from a plain-language route brief with a fully auditable tool-call trail |
+| Scaling an analyst's judgement across the network | A revenue-management team cannot manually review the ~600,000 flight-level pricing decisions/year | Tool-calling agent that plans forecast → optimise chains from a plain-language route brief with a fully auditable tool-call trail |
 
-> **Scale context:** At Qantas's FY2025 passenger-revenue base of A$18B, a 1% yield improvement is worth A$180M annually. Apex's demonstrated 7.3% LP revenue uplift versus flat allocation, sustained across the trunk network, would generate multiples of the team's cost in its first year while remaining fully auditable, reproducible, and deployable into the existing PROS stack.
+> **Scale context:** At Qantas's FY2025 passenger-revenue base of A$18B, a 1% yield improvement is worth A$180M annually. Apex's demonstrated 7.3% LP revenue uplift versus flat allocation, sustained across the trunk network, would generate multiples of the team's cost in its first year while remaining fully auditable, reproducible, and deployable into the existing commercial RM stack.
 
 ---
 
@@ -155,48 +155,50 @@ Apex is structured as four independently importable layers — each a standalone
 
 ```mermaid
 graph TB
-    subgraph PIPELINE["Orchestration — python run.py"]
-        RUN["run.py (single entry point)"]
+    RUN["Single-command orchestration"]
+
+    subgraph DATA["Stage 01 — Data Generation"]
+        GEN["BITRE-calibrated generator — 313 weeks x 10 routes"]
+        CAL["Calendar, holidays, RBA / ABS / IATA macro series"]
     end
 
-    subgraph DATA["Stage 01 — Data Generation (pipeline/01)"]
-        GEN["BITRE-calibrated generator<br/>313 weeks × 10 routes"]
-        CAL["Calendar + holidays + events<br/>RBA / ABS / IATA macro series"]
-    end
-
-    subgraph ML["Stage 02 — Demand Forecaster (pipeline/02 → src/models)"]
-        HW["Holt-Winters (α, β, γ) grid search<br/>multiplicative seasonality, m=52"]
-        GBT["Gradient-boosted residual model<br/>30 features · depth-4 trees · ν=0.08"]
-        CV["Walk-forward TimeSeriesSplit<br/>5 folds · 26-week validation"]
-        BOOT["Bootstrap 95% CI<br/>300 residual resamples"]
+    subgraph ML["Stage 02 — Demand Forecaster"]
+        HW["Holt-Winters grid search — multiplicative m=52"]
+        GBT["Gradient-boosted residual model — 30 features"]
+        CV["Walk-forward TimeSeriesSplit — 5 folds"]
+        BOOT["Bootstrap 95 percent CI — 300 resamples"]
         HW --> GBT --> CV --> BOOT
     end
 
-    subgraph OPT["Stage 03 — Seat Optimiser (pipeline/04 → src/optimiser)"]
-        LP["Primal LP — revenue maximisation<br/>4 cabins · 5 constraints · HiGHS backend"]
-        DUAL["Dual variables → bid prices<br/>λ*_cap = ∂R* / ∂C"]
+    subgraph OPT["Stage 03 — Seat Optimiser"]
+        LP["Primal LP revenue maximisation — HiGHS backend"]
+        DUAL["Dual variables recovered as bid prices"]
         LP --> DUAL
     end
 
-    subgraph CI["Stage 03b — Causal Inference (pipeline/03 → src/causal)"]
-        DID["Difference-in-Differences<br/>Rex administration natural experiment<br/>HC1-robust SEs + placebo trends test"]
-        IV["2SLS Instrumental Variables<br/>fuel-index instrument · Hausman test<br/>Staiger-Stock F-diagnostic"]
+    subgraph CI["Stage 03b — Causal Inference"]
+        DID["Difference-in-Differences with HC1 SEs and placebo test"]
+        IV["2SLS IV with fuel-index instrument and Hausman test"]
     end
 
-    subgraph AGT["Stage 04 — RM Agent (pipeline/06 → src/agent)"]
-        SON["Claude Sonnet tool-calling orchestrator<br/>Anthropic SDK · structured tool schemas"]
-        T1["Tool: forecast_demand<br/>calls Stage 02"]
-        T2["Tool: optimise_allocation<br/>calls Stage 03"]
-        LOG["Audit trail<br/>every tool call logged with I/O + timestamp"]
-        SON --> T1 & T2 --> LOG
+    subgraph AGT["Stage 04 — RM Agent"]
+        SON["Tool-calling orchestrator — structured schemas"]
+        T1["Tool: forecast_demand"]
+        T2["Tool: optimise_allocation"]
+        LOG["Audit trail — every call logged with I/O and timestamp"]
+        SON --> T1
+        SON --> T2
+        T1 --> LOG
+        T2 --> LOG
     end
 
-    subgraph DASH["Stage 05 — Dashboard (pipeline/05)"]
-        HTML["Self-contained HTML dashboard<br/>Chart.js 4.4 · zero build pipeline"]
+    subgraph DASH["Stage 05 — Dashboard"]
+        HTML["Self-contained HTML dashboard — Chart.js, zero build"]
     end
 
     RUN --> DATA
-    DATA --> ML & CI
+    DATA --> ML
+    DATA --> CI
     ML --> OPT
     OPT --> AGT
     CI --> AGT
@@ -213,7 +215,7 @@ graph TB
 | Demand Forecaster | `src/models/` | Holt-Winters + GradientBoostingRegressor residual + walk-forward CV + bootstrap CI | Weekly passenger-demand forecasts with calibrated uncertainty, feeding LP allocation and bid-price decisions |
 | Seat Optimiser | `src/optimiser/` | scipy HiGHS linear programme with dual recovery | Optimal cabin allocation subject to capacity, load-factor and access-floor constraints — bid prices as dual variables |
 | Causal Inference | `src/causal/` | Difference-in-Differences (HC1-robust) + 2SLS IV + Hausman + Staiger-Stock + ADF (MacKinnon 1994) | Defensible causal estimates for competitor-exit effects and route-level price elasticity — supports pricing-committee decisions |
-| RM Agent | `src/agent/` | Claude Sonnet tool-calling on Anthropic SDK | Plain-language route briefs translated into forecast-then-optimise chains with auditable tool-call trails |
+| RM Agent | `src/agent/` | Structured tool-calling orchestrator with deterministic fallback | Plain-language route briefs translated into forecast-then-optimise chains with auditable tool-call trails |
 | Dashboard | `pipeline/05` | Self-contained HTML + Chart.js (no build pipeline) | Single-file interactive review surface — loads directly from `outputs/apex_dashboard.html` |
 
 ---
@@ -228,7 +230,7 @@ After running the pipeline, open `outputs/apex_dashboard.html` directly in any m
 | Demand Forecaster | Select any of 10 Australian domestic routes; the page renders actual versus Holt-Winters baseline versus hybrid forecast with 95% bootstrap CI, per-feature permutation importance, and route-level ADF stationarity diagnostics |
 | Seat Optimiser | Interactive LP: move capacity, load-factor target, overbooking buffer, forecast demand and each cabin yield; the optimal allocation, expected revenue, uplift vs. flat baseline and bid price recompute live via scipy HiGHS |
 | Causal Inference | DiD coefficient table with HC1 robust standard errors, parallel-trends placebo p-value, and group-means visualisation for the Rex administration event. Route-level OLS and IV elasticity estimates with Stage-1 F and Hausman diagnostics |
-| RM Agent | Plain-language route brief → Claude plans forecast + LP tool calls → structured recommendation with full audit trail of every tool invocation |
+| RM Agent | Plain-language route brief → agent plans forecast + LP tool calls → structured recommendation with full audit trail of every tool invocation |
 | Research Report | An independently researched analysis of Qantas's data and AI maturity, the revenue-management problems that remain unsolved, and how Apex maps directly to each one — with quantified business impact |
 | Results | Model-performance metrics with technical interpretation and plain-language business translation. Full 10-route result table loaded directly from `results/tables/` at build time |
 | Methodology | Complete technical walkthrough — data sourcing, feature engineering rationale, model selection, evaluation protocol, and deployment considerations |
@@ -240,7 +242,7 @@ After running the pipeline, open `outputs/apex_dashboard.html` directly in any m
 ### Prerequisites
 
 - Python 3.10 or higher
-- (Optional) An Anthropic API key for the RM Agent layer ([console.anthropic.com](https://console.anthropic.com)) — the agent includes a deterministic fallback for offline / unkeyed runs
+- (Optional) An inference-endpoint API key for the RM Agent layer — the agent includes a deterministic fallback for offline / unkeyed runs
 
 ### 1 — Clone and install dependencies
 
@@ -255,11 +257,11 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Open .env and add your Anthropic API key if you want the live RM Agent
+# Open .env and add your agent API key if you want the live RM Agent
 ```
 
 ```env
-ANTHROPIC_API_KEY=sk-ant-...
+AGENT_API_KEY=...
 LOG_LEVEL=INFO
 ```
 
@@ -313,13 +315,13 @@ Every stage is a standalone, independently runnable Python module under `pipelin
 
 ```mermaid
 flowchart LR
-    A[Weekly pax series<br/>313 weeks × 10 routes] --> B[Feature Engineering<br/>30 features: lags, rolling stats,<br/>calendar cyclical, macro, competitive]
-    B --> C[Holt-Winters<br/>α, β, γ grid search<br/>multiplicative seasonality m=52]
-    C --> D[Residuals ε_t = y_t − ŷ_t^HW]
-    D --> E[GradientBoostingRegressor<br/>M=200, ν=0.08, depth=4]
-    E --> F[Hybrid forecast<br/>ŷ = ŷ_HW + ε̂]
-    F --> G[Walk-forward TimeSeriesSplit<br/>5 folds · 26-week validation]
-    G --> H[Bootstrap 95% CI<br/>300 residual resamples]
+    A["Weekly pax series — 313 weeks x 10 routes"] --> B["Feature engineering — 30 features"]
+    B --> C["Holt-Winters grid search — multiplicative m=52"]
+    C --> D["Residuals from HW fit"]
+    D --> E["GradientBoostingRegressor — M=200, depth=4"]
+    E --> F["Hybrid forecast — HW + residual"]
+    F --> G["Walk-forward CV — 5 folds, 26-week validation"]
+    G --> H["Bootstrap 95 percent CI — 300 resamples"]
 ```
 
 ### Feature Engineering — 30 Features Across Six Semantic Groups
@@ -476,7 +478,7 @@ Typical IV elasticity estimates run 20–40% smaller in magnitude than OLS, whic
 
 ---
 
-## Agentic Layer — Claude Tool-Calling Orchestrator
+## Agentic Layer — Tool-Calling Orchestrator
 
 A revenue-management team cannot personally review each of the ~600,000 flight-level pricing decisions Qantas makes per year. Apex's RM agent ingests a plain-language route brief, autonomously invokes the forecaster and optimiser as structured tools, and returns an auditable recommendation in under 300 ms.
 
@@ -484,20 +486,20 @@ A revenue-management team cannot personally review each of the ~600,000 flight-l
 
 ```mermaid
 sequenceDiagram
-    participant User as Route brief (plain language)
-    participant Agent as Claude Sonnet Agent
-    participant FC as forecast_demand (Stage 02)
-    participant OPT as optimise_allocation (Stage 03)
-    participant OUT as Structured RM Recommendation
+    participant User as Route brief
+    participant Agent as Tool-calling agent
+    participant FC as forecast_demand
+    participant OPT as optimise_allocation
+    participant OUT as Structured recommendation
 
-    User->>Agent: "SYD-MEL, school holidays Monday,<br/>forecast LF 82%, need bid price guidance."
-    Agent->>Agent: Parse brief. Extract route + covariates.<br/>Decide: forecaster first, then LP.
-    Agent->>FC: forecast_demand(route="SYD-MEL", days_to_dep=14)
-    FC-->>Agent: forecast_pax=155 · mape=7.2% · ci=[142, 168]
-    Agent->>OPT: optimise_allocation(capacity=189, forecast=155, yields=[...])
-    OPT-->>Agent: allocation=[F:15,B:36,PE:25,E:113] · bid_price=247
-    Agent->>Agent: Synthesise rationale: "SYD-MEL school-holiday<br/>uplift + LP constraints produce A$247 Economy bid-price."
-    Agent->>OUT: recommendation + forecast + allocation + tool_call_audit_log
+    User->>Agent: SYD-MEL, school holidays, need bid-price guidance
+    Agent->>Agent: Parse brief, extract route and covariates
+    Agent->>FC: forecast_demand(route, days_to_dep)
+    FC-->>Agent: forecast_pax=155, mape=7.2 pct, ci=[142,168]
+    Agent->>OPT: optimise_allocation(capacity, forecast, yields)
+    OPT-->>Agent: allocation=[F15,B36,PE25,E113], bid_price=247
+    Agent->>Agent: Synthesise rationale from tool outputs
+    Agent->>OUT: recommendation + forecast + allocation + audit log
 ```
 
 ### What Distinguishes This Agent from a Pipeline
@@ -555,7 +557,7 @@ TOOLS = [
 
 ### Graceful Degradation — the Deterministic Fallback
 
-Production RM cannot depend on a third-party API being available. Apex includes a deterministic rule-based fallback: if the Anthropic API is unreachable or rate-limited, the agent falls back to a policy-derived recommendation using the LP output directly. The dashboard surfaces which mode is active. This is the pattern every production LLM system in a commercial setting must implement — the LLM adds judgement quality, but the system remains functional without it.
+Production RM cannot depend on a third-party inference endpoint being available. Apex includes a deterministic rule-based fallback: if the agent service is unreachable or rate-limited, the agent falls back to a policy-derived recommendation using the LP output directly. The dashboard surfaces which mode is active. This is the pattern every production agentic system in a commercial setting must implement — the model adds judgement quality, but the platform remains functional without it.
 
 ---
 
@@ -609,7 +611,7 @@ Production RM cannot depend on a third-party API being available. Apex includes 
 | Walk-forward cross-validation | `TimeSeriesSplit` with 5 folds, 26-week validation | Eliminates look-ahead leakage that random k-fold introduces on time-series |
 | Bootstrap uncertainty | 300 residual resamples — non-parametric | Aviation-demand residuals are fat-tailed; Gaussian CIs would understate risk |
 | Reproducibility | `numpy.random.default_rng(seed=...)` threaded through every stochastic step | Running `python run.py` twice produces identical artefacts |
-| Deterministic agent fallback | If Anthropic API is unreachable, use the LP output directly | Production RM cannot block on a third-party API |
+| Deterministic agent fallback | If the agent inference endpoint is unreachable, use the LP output directly | Production RM cannot block on a third-party service |
 | Self-contained dashboard | One HTML file, no build pipeline, no node_modules | Reviewer-friendly — open `outputs/apex_dashboard.html` in any browser |
 | Structured logging | `src/utils/logger.py` with `get_logger(__name__)` | Every stage tags its own logger — trivial to grep through pipeline output |
 | Test coverage | `pytest` unit tests for every quantitative primitive | HW, ADF, LP, DiD, IV, feature engineering — each has its own test file |
@@ -649,7 +651,7 @@ apex/
 │   │   └── price_elasticity.py         # OLS + 2SLS IV + Hausman + Staiger-Stock F
 │   │
 │   ├── agent/
-│   │   └── rm_agent.py                 # Claude tool-calling + deterministic fallback
+│   │   └── rm_agent.py                 # Tool-calling orchestrator + deterministic fallback
 │   │
 │   └── utils/
 │       ├── logger.py                   # Centralised `get_logger(__name__)`
@@ -691,7 +693,7 @@ apex/
 | ML | scikit-learn 1.5 | `GradientBoostingRegressor` residual layer, `TimeSeriesSplit`, `permutation_importance` |
 | Optimisation | SciPy 1.13 (HiGHS) | State-of-the-art LP solver since SciPy ≥1.9; sub-millisecond 4-variable, 5-constraint LP solves |
 | Stationarity testing | Hand-rolled on NumPy | ADF with MacKinnon (1994) p-values — demonstrates the mathematics, no `statsmodels` dependency |
-| LLM orchestration | Anthropic SDK (`anthropic`) | Claude Sonnet tool-calling — lowest production schema-violation rate for structured tool use |
+| Agent orchestration | Tool-calling language model | Structured function-calling for low schema-violation rate when invoking downstream optimisers |
 | Dashboard charts | Chart.js 4.4 | Zero build pipeline — the dashboard is one self-contained HTML file |
 | Testing | pytest 8 | Unit tests per quantitative primitive |
 | Logging | `logging` stdlib + `get_logger(__name__)` | No custom observability dependency |
